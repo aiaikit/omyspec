@@ -2,11 +2,13 @@ module github.com/aiaikit/speckit
 
 go 1.24
 
-require github.com/spf13/cobra v1.8.0
+require (
+	github.com/charmbracelet/lipgloss v1.0.0
+	github.com/spf13/cobra v1.8.0
+)
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect

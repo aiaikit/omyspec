@@ -30,11 +30,11 @@ func NewConsole(out, err io.Writer) Console {
 }
 
 func (c *consoleImpl) Print(msg string) {
-	fmt.Fprint(c.out, msg)
+	fmt.Fprintln(c.out, msg)
 }
 
 func (c *consoleImpl) PrintErr(msg string) {
-	fmt.Fprint(c.err, msg)
+	fmt.Fprintln(c.err, msg)
 }
 
 func (c *consoleImpl) PrintPanel(title, body string, _ Style) {

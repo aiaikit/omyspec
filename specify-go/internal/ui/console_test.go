@@ -11,10 +11,10 @@ func TestNewConsoleWritesToProvidedBuffers(t *testing.T) {
 	c := NewConsole(&out, &errBuf)
 	c.Print("hello stdout")
 	c.PrintErr("hello stderr")
-	if got := out.String(); got != "hello stdout" {
+	if got := strings.TrimSpace(out.String()); got != "hello stdout" {
 		t.Errorf("stdout = %q, want %q", got, "hello stdout")
 	}
-	if got := errBuf.String(); got != "hello stderr" {
+	if got := strings.TrimSpace(errBuf.String()); got != "hello stderr" {
 		t.Errorf("stderr = %q, want %q", got, "hello stderr")
 	}
 }
