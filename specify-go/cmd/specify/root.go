@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/aiaikit/speckit/internal/version"
 )
 
 // NewRootCmd constructs the root cobra command for the specify CLI.
@@ -13,9 +15,10 @@ import (
 // "not yet implemented" — they will be filled in by Phase 2+.
 func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "specify",
-		Short: "Setup tool for Specify spec-driven development projects",
-		Long:  "specify — bootstrap and manage Spec Kit projects. Phase 1 ships only the skeleton.",
+		Use:     "specify",
+		Short:   "Setup tool for Specify spec-driven development projects",
+		Long:    "specify — bootstrap and manage Spec Kit projects. Phase 1 ships only the skeleton.",
+		Version: version.Version,
 	}
 	cmd.AddCommand(newVersionCmd(), newCheckCmd())
 	cmd.AddCommand(placeholderCmd("init"))
@@ -30,9 +33,15 @@ func NewRootCmd() *cobra.Command {
 	return cmd
 }
 
-// newVersionCmd is added in Task 3; placeholder for now.
+// newVersionCmd prints the current version and exits.
 func newVersionCmd() *cobra.Command {
-	return &cobra.Command{Use: "version", Short: "Print version"}
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print version and exit",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Fprintln(cmd.OutOrStdout(), "specify", version.Version)
+		},
+	}
 }
 
 // newCheckCmd is added in Task 14; placeholder for now.
