@@ -44,11 +44,6 @@ func newVersionCmd() *cobra.Command {
 	}
 }
 
-// newCheckCmd is added in Task 14; placeholder for now.
-func newCheckCmd() *cobra.Command {
-	return &cobra.Command{Use: "check", Short: "Check tool availability"}
-}
-
 func placeholderCmd(name string) *cobra.Command {
 	return &cobra.Command{
 		Use:   name,
