@@ -68,8 +68,7 @@ func (r *Root) validate(rel string) error {
 	}
 	// Symlink-component check: walk each component from root.
 	cur := r.abs
-	parts := strings.Split(cleaned, string(filepath.Separator))
-	for _, p := range parts {
+	for p := range strings.SplitSeq(cleaned, string(filepath.Separator)) {
 		if p == "" || p == "." {
 			continue
 		}
@@ -99,31 +98,35 @@ func (r *Root) Open(rel string) (*os.File, error) {
 }
 
 // WriteFile writes data to a relative path, creating parent dirs.
+//ponytail: uses os.WriteFile stdlib (go1.16+), not os.Root (go1.25+) — upgrade when module moves to go1.25.
 func (r *Root) WriteFile(rel string, data []byte, perm os.FileMode) error {
 	if err := r.validate(rel); err != nil {
 		return err
 	}
+	path := filepath.Join(r.abs, rel)
 	if dir := filepath.Dir(rel); dir != "." && dir != "" {
-		if err := r.osRoot.Mkdir(dir, 0o755); err != nil && !os.IsExist(err) {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
 	}
-	return r.osRoot.WriteFile(rel, data, perm)
+	return os.WriteFile(path, data, perm)
 }
 
 // MkdirAll creates a directory hierarchy.
+//ponytail: uses os.MkdirAll stdlib (go1.16+), not os.Root (go1.25+) — upgrade when module moves to go1.25.
 func (r *Root) MkdirAll(rel string, perm os.FileMode) error {
 	if err := r.validate(rel); err != nil {
 		return err
 	}
-	return r.osRoot.MkdirAll(rel, perm)
+	return os.MkdirAll(filepath.Join(r.abs, rel), perm)
 }
 
 // Chmod changes the mode of a file. On Windows, only the read-only bit
 // is meaningful; other bits are silently ignored by the OS.
+//ponytail: uses os.Chmod stdlib (go1.16+), not os.Root (go1.25+) — upgrade when module moves to go1.25.
 func (r *Root) Chmod(rel string, mode os.FileMode) error {
 	if err := r.validate(rel); err != nil {
 		return err
 	}
-	return r.osRoot.Chmod(rel, mode)
+	return os.Chmod(filepath.Join(r.abs, rel), mode)
 }
