@@ -88,10 +88,13 @@ reach GitHub, pass `--tag` explicitly, or skip the CLI and use npm directly:
 
 ## Publishing
 
-A published GitHub release runs the whole pipeline: vendor wheels on nine
-(OS, CPython) cells, assemble, `check`, pack, publish. Publishing is the
-default for release events; a manual dispatch defaults to a dry run and only
-reports the packed contents. Two settings decide where it goes:
+Pushing a `vX.Y.Z` tag runs the whole pipeline: vendor wheels on nine
+(OS, CPython) cells, assemble, `check`, pack, publish. Publishing is the default
+for a tag push; a manual dispatch defaults to a dry run and only reports the
+packed contents. The trigger is the tag rather than the GitHub Release, because
+that release is created by another workflow using `GITHUB_TOKEN`, and events
+caused by `GITHUB_TOKEN` can be suppressed from starting further runs — a chain
+that would silently never publish. Two settings decide where it goes:
 
 | Setting | Purpose |
 | --- | --- |
@@ -106,6 +109,12 @@ A version with a prerelease suffix (`1.0.13-rc.1`) is published under the `next`
 dist-tag so `latest` keeps pointing at the last stable release. Every non-dry
 run also uploads the tarball and its `npm-tarball.sha256` as the `npm-tarball`
 artifact, which is what air-gapped sites install from directly.
+
+The tag push starts the npm pipeline directly, in parallel with the GitHub
+Release that `Create Release` publishes. That release is created with
+`GITHUB_TOKEN`, and events caused by `GITHUB_TOKEN` can be suppressed from
+starting further workflow runs, so chaining the npm publish behind it would risk
+publishing nothing at all with no failure to look at.
 
 ## Building the tarball by hand
 
