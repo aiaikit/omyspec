@@ -3,15 +3,19 @@ name: Publish npm distribution
 # Builds the offline-installable npm tarball: the specify-cli wheel plus every
 # runtime dependency, vendored for each supported platform and CPython version.
 #
-# A published GitHub release runs this end to end, publish included. The manual
-# form defaults to a dry run so dispatching it cannot publish by accident. The
-# target registry comes from the NPM_REGISTRY repository variable and defaults
-# to the public one; an internal mirror is the same workflow with that variable
-# pointed at the mirror.
+# Pushing a `vX.Y.Z` tag runs this end to end, publish included. The trigger is
+# the tag itself, not the GitHub Release: that release is created by another
+# workflow using GITHUB_TOKEN, and events caused by GITHUB_TOKEN can be
+# suppressed from starting further runs — a chain that would silently never
+# publish. The manual form defaults to a dry run so dispatching it cannot
+# publish by accident. The target registry comes from the NPM_REGISTRY
+# repository variable and defaults to the public one; an internal mirror is the
+# same workflow with that variable pointed at the mirror.
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -32,9 +36,9 @@ on:
 permissions:
   contents: read
 
-# A release event and a manual dispatch of the same tag must not publish twice.
+# A tag push and a manual dispatch of the same tag must not publish twice.
 concurrency:
-  group: publish-npm-${{ github.event.release.tag_name || inputs.tag }}
+  group: publish-npm-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -48,7 +52,7 @@ jobs:
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -63,7 +67,7 @@ jobs:
         id: plan
         env:
           INPUT_TAG: ${{ inputs.tag }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          PUSHED_REF: ${{ github.ref }}
           EVENT_NAME: ${{ github.event_name }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
@@ -74,9 +78,13 @@ jobs:
           sys.path.insert(0, ".github/scripts")
           import build_npm_package as builder
 
-          tag = os.environ["INPUT_TAG"] or os.environ["RELEASE_TAG"]
+          # On a tag push, the tag is the ref itself; a dispatch passes it in.
+          if os.environ["EVENT_NAME"] == "push":
+              tag = os.environ["PUSHED_REF"].removeprefix("refs/tags/")
+          else:
+              tag = os.environ["INPUT_TAG"]
           if not tag:
-              sys.exit("no release tag: the event carried neither a release tag nor an input")
+              sys.exit("no release tag: the event carried neither a tag ref nor an input")
 
           pep440, _requires = builder.pyproject_versions()
           if tag.lstrip("vV") != pep440:
@@ -86,7 +94,7 @@ jobs:
           # A prerelease published under `latest` would become what every plain
           # `npm install -g` resolves to.
           dist_tag = "next" if "-" in semver else "latest"
-          publish = os.environ["EVENT_NAME"] == "release" or os.environ["DRY_RUN"] != "true"
+          publish = os.environ["EVENT_NAME"] == "push" or os.environ["DRY_RUN"] != "true"
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
               handle.write(f"tag={tag}\n")

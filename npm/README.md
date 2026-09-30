@@ -81,8 +81,7 @@ to support, each on that platform itself — wheels with native extensions are
 resolved for the machine running the download.
 
 Publishing is automated: the `Publish npm distribution` workflow runs when a
-`vX.Y.Z` release is published and pushes the tarball to the registry in
-`NPM_REGISTRY` (default: the public registry) using `NPM_AUTH_TOKEN`. Pre-release
+`vX.Y.Z` tag is pushed and sends the tarball to the registry in `NPM_REGISTRY` (default: the public registry) using `NPM_AUTH_TOKEN`. Pre-release
 versions are published to the `next` dist-tag so `latest` stays stable. See
 [`docs/install/npm.md`](../docs/install/npm.md#publishing).
 
