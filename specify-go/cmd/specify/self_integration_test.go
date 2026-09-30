@@ -10,23 +10,26 @@ import (
 	"github.com/aiaikit/speckit/cmd/specify/preset"
 )
 
-func TestSelfCheck_CmdExists(t *testing.T) {
+func TestSelfCheck_OutputContainsVersion(t *testing.T) {
 	cmd := SelfCheckCmd()
 	if cmd == nil {
 		t.Fatal("SelfCheckCmd() returned nil")
 	}
-	// Exercise the command in a temp dir (no network required for construction).
 	cmd.SetArgs([]string{})
 	buf := new(strings.Builder)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	if err := cmd.Execute(); err != nil {
-		t.Logf("output: %s", buf.String())
-		t.Logf("stderr: %s", buf.String())
+		t.Fatalf("SelfCheckCmd().Execute() error: %v", err)
+	}
+	out := buf.String()
+	// Must show "Installed:" line with a version
+	if !strings.Contains(out, "Installed:") {
+		t.Errorf("expected 'Installed:' in output, got: %s", out)
 	}
 }
 
-func TestExtensionList_CmdExists(t *testing.T) {
+func TestExtensionList_ShowsBundledExtensions(t *testing.T) {
 	cmd := extension.ExtensionListCmd()
 	if cmd == nil {
 		t.Fatal("ExtensionListCmd() returned nil")
@@ -36,8 +39,12 @@ func TestExtensionList_CmdExists(t *testing.T) {
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	if err := cmd.Execute(); err != nil {
-		t.Logf("output: %s", buf.String())
-		t.Errorf("ExtensionListCmd().Execute() error: %v", err)
+		t.Fatalf("ExtensionListCmd().Execute() error: %v", err)
+	}
+	out := buf.String()
+	// Bundled extension "agent-context" should appear
+	if !strings.Contains(out, "agent-context") {
+		t.Errorf("expected bundled extension 'agent-context' in output, got: %s", out)
 	}
 }
 
@@ -68,7 +75,6 @@ func TestPresetList_CmdExists(t *testing.T) {
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	if err := cmd.Execute(); err != nil {
-		t.Logf("output: %s", buf.String())
-		t.Errorf("PresetListCmd().Execute() error: %v", err)
+		t.Fatalf("PresetListCmd().Execute() error: %v", err)
 	}
 }
