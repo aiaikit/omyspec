@@ -30,10 +30,11 @@ def self_upgrade(
     to preview without mutating anything. See `specify self check` for the
     non-destructive read-only counterpart.
 
-    Detection classifies the runtime into uv-tool / pipx / uvx (ephemeral) /
-    source-checkout / unsupported. Only uv-tool and pipx are upgraded
-    automatically; the other three paths print path-specific guidance and
-    exit 0.
+    Detection classifies the runtime into uv-tool / pipx / npm /
+    uvx (ephemeral) / source-checkout / unsupported. Only uv-tool, pipx and
+    npm are upgraded automatically; the other three paths print path-specific
+    guidance and exit 0. The npm channel resolves its target through the
+    configured registry, so `--tag` is the offline-safe form.
 
     Exit codes:
       0      success or no-op-success (already on latest, --dry-run, or

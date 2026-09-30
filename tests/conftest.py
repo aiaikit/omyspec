@@ -236,3 +236,36 @@ def unsupported_argv0(monkeypatch, tmp_path):
     return _fake_self_upgrade_argv0(
         monkeypatch, tmp_path, "HOME", ("random", "location", "bin")
     )
+
+
+@pytest.fixture
+def npm_argv0(monkeypatch, tmp_path):
+    """Point sys.argv[0] at the runtime the npm channel unpacks.
+
+    The npm launcher starts the CLI as ``python -m specify_cli``, so argv[0] is
+    the unpacked ``__main__.py`` inside a per-user site directory rather than a
+    `specify` console script.
+    """
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    if os.name == "nt":
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        runtime_dir = tmp_path.joinpath(
+            "specify-cli-npm", "runtime", "cp311-1.0.13", "site-packages", "specify_cli"
+        )
+    else:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        runtime_dir = (
+            tmp_path
+            / ".local"
+            / "share"
+            / "specify-cli-npm"
+            / "runtime"
+            / "cp311-1.0.13"
+            / "site-packages"
+            / "specify_cli"
+        )
+    runtime_dir.mkdir(parents=True)
+    entrypoint = runtime_dir / "__main__.py"
+    entrypoint.write_text("from . import main\nmain()\n")
+    monkeypatch.setattr("sys.argv", [str(entrypoint)])
+    return entrypoint

@@ -56,10 +56,28 @@ To install a specific release, pin the version — for example `uv tool install 
 
 Run directly without installing — see the [One-time usage (uvx)](install/one-time.md) guide.
 
+### npm (offline / enterprise)
+
+For environments that distribute software through an npm registry, the CLI is
+published as `@aiaikit/specify-cli`, built from the `npm/` packaging in this
+repository. It vendors the `specify-cli` wheel and every Python dependency
+inside the tarball, so the install needs no `pip`, no `python3-venv`, and no
+network beyond your npm registry:
+
+```bash
+npm install -g @aiaikit/specify-cli
+# or, from a transferred tarball with no registry at all:
+npm install -g ./aiaikit-specify-cli-1.0.13.tgz
+```
+
+See the [npm installation guide](install/npm.md) for prerequisites and the
+build steps.
+
 ### Alternative Package Managers
 
 - **PyPI** — see the [PyPI installation guide](install/pypi.md)
 - **pipx** — see the [pipx installation guide](install/pipx.md)
+- **npm** — see the [npm installation guide](install/npm.md)
 - **Enterprise / Air-Gapped** — see the [air-gapped installation guide](install/air-gapped.md)
 
 ### Specify Integration

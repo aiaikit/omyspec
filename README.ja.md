@@ -43,6 +43,8 @@ specify init my-project --integration copilot
 cd my-project
 ```
 
+npmレジストリ経由で配布する場合は、[npmディストリビューション](https://github.github.io/spec-kit/install/npm.html)を利用してください。Pythonランタイムがtarballに同梱されているため、インストールに`pip`もネットワーク接続も不要です。
+
 <a id="-対応しているaiコーディングエージェント"></a>
 
 この例では **GitHub Copilotのデフォルトのスキルモード** を使用しています。他の対応エージェントを使う場合は、`copilot` をお使いのエージェントの[連携キー](https://github.github.io/spec-kit/reference/integrations.html)に置き換えてください。
