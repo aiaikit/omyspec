@@ -26,6 +26,7 @@ func PresetInfoCmd() *cobra.Command {
 			fmt.Fprintf(out, "ID: %s\n", p.ID)
 			fmt.Fprintf(out, "Version: %s\n", p.Version)
 			fmt.Fprintf(out, "Description: %s\n", p.Description)
+			fmt.Fprintf(out, "Bundled: %t\n", p.Bundled)
 			return nil
 		},
 	}

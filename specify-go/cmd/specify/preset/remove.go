@@ -34,7 +34,7 @@ func PresetRemoveCmd() *cobra.Command {
 				return fmt.Errorf("Failed to remove preset %s: %w", id, err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Removed preset: %s\n", id)
+			fmt.Fprintf(cmd.OutOrStdout(), "Removed preset\n")
 			return nil
 		},
 	}
