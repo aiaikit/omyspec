@@ -6,7 +6,97 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/aiaikit/speckit/internal/ui"
 )
+
+func TestEnsureConstitutionFromTemplate_Materializes(t *testing.T) {
+	tmp := t.TempDir()
+	// Pre-create .specify/memory so MkdirAll doesn't fail
+	memDir := filepath.Join(tmp, ".specify", "memory")
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	tr := ui.NewTracker("test")
+	err := ensureConstitutionFromTemplate(tmp, tr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	dst := filepath.Join(memDir, "constitution.md")
+	if _, err := os.Stat(dst); err != nil {
+		t.Fatalf("constitution.md not created: %v", err)
+	}
+}
+
+func TestEnsureConstitutionFromTemplate_SkipsIfExists(t *testing.T) {
+	tmp := t.TempDir()
+	memDir := filepath.Join(tmp, ".specify", "memory")
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	existing := filepath.Join(memDir, "constitution.md")
+	if err := os.WriteFile(existing, []byte("already there"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tr := ui.NewTracker("test")
+	err := ensureConstitutionFromTemplate(tmp, tr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, err := os.ReadFile(existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "already there" {
+		t.Fatalf("constitution was overwritten, want 'already there', got %q", string(got))
+	}
+}
+
+func TestEnsureExecutableScripts_ChmodsShFiles(t *testing.T) {
+	tmp := t.TempDir()
+	scriptsDir := filepath.Join(tmp, ".specify", "scripts")
+	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write a non-executable .sh file
+	scriptPath := filepath.Join(scriptsDir, "test.sh")
+	if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\necho hi"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tr := ui.NewTracker("test")
+	err := ensureExecutableScripts(tmp, tr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(scriptPath)
+	if err != nil {
+		t.Fatalf("stat script: %v", err)
+	}
+	if mode := info.Mode(); mode&0111 == 0 {
+		t.Fatalf("script not executable, mode=%v", mode)
+	}
+}
+
+func TestEnsureExecutableScripts_SkipsIfNoScriptsDir(t *testing.T) {
+	tmp := t.TempDir()
+	// .specify exists but no scripts/
+	if err := os.MkdirAll(filepath.Join(tmp, ".specify"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	tr := ui.NewTracker("test")
+	err := ensureExecutableScripts(tmp, tr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
 func TestInitCmd_RunE_UnknownIntegration(t *testing.T) {
 	tmp := t.TempDir()

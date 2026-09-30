@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/aiaikit/speckit/internal/assets"
 	"github.com/aiaikit/speckit/internal/integration"
@@ -105,6 +106,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	tr.Add("shared-infra", "Install shared infrastructure")
 	tr.Add("scripts", "Copy scripts")
 	tr.Add("templates", "Copy templates")
+	tr.Add("constitution", "Materialize constitution")
+	tr.Add("chmod-scripts", "Make scripts executable")
 	tr.Add("manifest", "Write manifest")
 	tr.Add("workflow", "Install bundled workflow")
 	tr.Add("final", "Finalize")
@@ -152,6 +155,22 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	tr.Mark("templates", ui.Done, "done")
 	tr.Mark("shared-infra", ui.Done, "done")
+
+	// Materialize constitution
+	tr.Mark("constitution", ui.Running, "")
+	if err := ensureConstitutionFromTemplate(projectPath, tr); err != nil {
+		tr.Mark("constitution", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("ensure constitution: %w", err)
+	}
+
+	// chmod scripts
+	tr.Mark("chmod-scripts", ui.Running, "")
+	if err := ensureExecutableScripts(projectPath, tr); err != nil {
+		tr.Mark("chmod-scripts", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("ensure executable scripts: %w", err)
+	}
 
 	// Write manifest
 	tr.Mark("manifest", ui.Running, "")
@@ -275,6 +294,87 @@ func copyDir(srcFS fs.FS, projectPath, rootRelBase, relRoot string) error {
 			return err
 		}
 		return os.WriteFile(dstPath, srcData, 0644)
+	})
+}
+
+// ensureConstitutionFromTemplate copies constitution-template.md from assets to
+// projectPath/.specify/memory/constitution.md if the target doesn't already exist.
+// If the template is missing, it reports an error via tracker.
+func ensureConstitutionFromTemplate(projectPath string, tracker ui.Tracker) error {
+	srcData, err := fs.ReadFile(assets.Templates(), "constitution-template.md")
+	if err != nil {
+		tracker.Mark("constitution", ui.Error, "template not found")
+		return fmt.Errorf("read constitution-template.md: %w", err)
+	}
+	dir := filepath.Join(projectPath, ".specify", "memory")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("mkdir memory dir: %w", err)
+	}
+	dstPath := filepath.Join(dir, "constitution.md")
+	if info, statErr := os.Stat(dstPath); statErr == nil && info.Mode().IsRegular() {
+		tracker.Mark("constitution", ui.Skipped, "already exists")
+		return nil
+	}
+	// If stat failed for a reason other than not existing, treat it as "not exists"
+	if writeErr := os.WriteFile(dstPath, srcData, 0644); writeErr != nil {
+		return fmt.Errorf("write constitution: %w", writeErr)
+	}
+	tracker.Mark("constitution", ui.Done, "materialized")
+	return nil
+}
+
+// ensureExecutableScripts chmods +x every .sh file under
+// projectPath/.specify/scripts/.
+func ensureExecutableScripts(projectPath string, tracker ui.Tracker) error {
+	scriptsDir := filepath.Join(projectPath, ".specify", "scripts")
+	entries, err := os.ReadDir(scriptsDir)
+	if os.IsNotExist(err) {
+		tracker.Mark("chmod-scripts", ui.Skipped, "no scripts directory")
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read scripts dir: %w", err)
+	}
+	var made, missing int
+	for _, e := range entries {
+		if e.IsDir() {
+			if err := walkShFiles(filepath.Join(scriptsDir, e.Name()), &made, &missing); err != nil {
+				return err
+			}
+		} else if strings.HasSuffix(e.Name(), ".sh") {
+			path := filepath.Join(scriptsDir, e.Name())
+			if err := os.Chmod(path, 0755); err != nil {
+				missing++
+				continue
+			}
+			made++
+		}
+	}
+	if missing > 0 {
+		tracker.Mark("chmod-scripts", ui.Done, fmt.Sprintf("%d made executable, %d failed", made, missing))
+	} else {
+		tracker.Mark("chmod-scripts", ui.Done, fmt.Sprintf("%d made executable", made))
+	}
+	return nil
+}
+
+// walkShFiles recursively chmods +x all .sh files under dir.
+func walkShFiles(dir string, made, missing *int) error {
+	return filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".sh") {
+			if err := os.Chmod(path, 0755); err != nil {
+				(*missing)++
+				return nil
+			}
+			(*made)++
+		}
+		return nil
 	})
 }
 
