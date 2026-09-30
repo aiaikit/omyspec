@@ -50,11 +50,6 @@ type Result struct {
 // error for process-spawn failures (e.g., binary not found) or context
 // cancellation. This mirrors Python's subprocess.run semantics.
 func Run(name string, args []string, opts RunOpts) (*Result, error) {
-	cmd := exec.Command(name, args...)
-	if opts.Dir != "" {
-		cmd.Dir = opts.Dir
-	}
-
 	// Build env: start from scratch so we don't accidentally pull in GH creds.
 	env := make([]string, 0, len(os.Environ())+len(opts.Env))
 	if opts.scrub() {
@@ -67,7 +62,6 @@ func Run(name string, args []string, opts RunOpts) (*Result, error) {
 	} else {
 		env = append(env, opts.Env...)
 	}
-	cmd.Env = env
 
 	stdout := opts.Stdout
 	if stdout == nil {
@@ -78,28 +72,27 @@ func Run(name string, args []string, opts RunOpts) (*Result, error) {
 		stderr = io.Discard
 	}
 	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = io.MultiWriter(stdout, &stdoutBuf)
-	cmd.Stderr = io.MultiWriter(stderr, &stderrBuf)
-
-	if opts.Stdin != nil {
-		cmd.Stdin = opts.Stdin
-	}
 
 	ctx := opts.Context
 	var cancel context.CancelFunc
 	if opts.Timeout > 0 {
 		ctx, cancel = context.WithTimeout(context.Background(), opts.Timeout)
 	}
+
+	var cmd *exec.Cmd
 	if ctx != nil {
 		cmd = exec.CommandContext(ctx, name, args...)
-		cmd.Dir = opts.Dir
-		cmd.Env = env
-		cmd.Stdout = io.MultiWriter(stdout, &stdoutBuf)
-		cmd.Stderr = io.MultiWriter(stderr, &stderrBuf)
-		if opts.Stdin != nil {
-			cmd.Stdin = opts.Stdin
-		}
+	} else {
+		cmd = exec.Command(name, args...)
 	}
+	cmd.Dir = opts.Dir
+	cmd.Env = env
+	cmd.Stdout = io.MultiWriter(stdout, &stdoutBuf)
+	cmd.Stderr = io.MultiWriter(stderr, &stderrBuf)
+	if opts.Stdin != nil {
+		cmd.Stdin = opts.Stdin
+	}
+
 	if cancel != nil {
 		defer cancel()
 	}
