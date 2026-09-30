@@ -54,9 +54,10 @@ func VersionCmd() *cobra.Command {
 				// Network failure — skip upgrade notice silently.
 				return nil
 			}
+			current := strings.TrimPrefix(v, "v")
 			latest := strings.TrimPrefix(rel.TagName, "v")
 			status := "up-to-date"
-			if latest != v {
+			if latest != current {
 				status = "upgrade available"
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Latest release: %s (%s)\n", rel.TagName, status)
