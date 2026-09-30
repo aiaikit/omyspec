@@ -26,10 +26,11 @@ func SelfUpgradeCmd() *cobra.Command {
 			case version.InstallPipx:
 				argv = []string{"pipx", "upgrade", "specify-cli"}
 			case version.InstallNPM:
-				argv = []string{"npm", "install", "-g", "specify-cli"}
+				pkg := "specify-cli"
 				if tag != "" {
-					argv = append(argv, tag+"@") // npm: version appended as @v1.2.3 to package
+					pkg = "specify-cli@" + tag // e.g. specify-cli@v1.2.3
 				}
+				argv = []string{"npm", "install", "-g", pkg}
 			case version.InstallUVXEphemeral:
 				if dryRun {
 					fmt.Fprintln(cmd.OutOrStdout(), "[dry run] would print: Upgrade uvx-installed specify via: uvx run specify")
@@ -53,8 +54,12 @@ func SelfUpgradeCmd() *cobra.Command {
 				return nil
 			}
 
-			if tag != "" && method != version.InstallNPM {
-				argv = append(argv, tag)
+			if tag != "" {
+				if method == version.InstallUVTool {
+					fmt.Fprintln(cmd.OutOrStdout(), "Note: --tag is ignored for uv-tool installs (uv manages versions automatically)")
+				} else if method == version.InstallPipx {
+					fmt.Fprintln(cmd.OutOrStdout(), "Note: --tag is ignored for pipx installs (pipx manages versions automatically)")
+				}
 			}
 
 			if dryRun {
