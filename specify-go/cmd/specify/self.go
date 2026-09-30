@@ -11,6 +11,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// SelfCmd is the parent command for self-management subcommands.
+func SelfCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "self",
+		Short: "Commands for managing the specify CLI itself",
+	}
+	cmd.AddCommand(SelfCheckCmd())
+	cmd.AddCommand(SelfUpgradeCmd())
+	return cmd
+}
+
 func SelfCheckCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check",

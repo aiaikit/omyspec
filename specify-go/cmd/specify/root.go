@@ -29,8 +29,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(placeholderCmd("event"))
 	cmd.AddCommand(placeholderCmd("bundle"))
 	cmd.AddCommand(placeholderCmd("artifact"))
-	cmd.AddCommand(placeholderCmd("self"))
-	cmd.AddCommand(SelfCheckCmd())
+	cmd.AddCommand(SelfCmd())
 	return cmd
 }
 
