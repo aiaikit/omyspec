@@ -21,7 +21,7 @@ func NewRootCmd() *cobra.Command {
 		Version: version.Version,
 	}
 	cmd.AddCommand(newVersionCmd(), newCheckCmd())
-	cmd.AddCommand(placeholderCmd("init"))
+	cmd.AddCommand(InitCmd())
 	cmd.AddCommand(placeholderCmd("integration"))
 	cmd.AddCommand(placeholderCmd("extension"))
 	cmd.AddCommand(placeholderCmd("preset"))
