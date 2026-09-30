@@ -1,0 +1,56 @@
+{
+  "name": "@aiaikit/specify-cli",
+  "version": "1.0.13-dev.0",
+  "description": "GitHub Spec Kit \u2014 bootstrap projects for Spec-Driven Development (SDD). npm distribution with a vendored, offline Python runtime.",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aiaikit/omyspec.git",
+    "directory": "npm"
+  },
+  "homepage": "https://github.com/aiaikit/omyspec",
+  "keywords": [
+    "spec-driven-development",
+    "sdd",
+    "spec-kit",
+    "ai-coding-agent",
+    "offline",
+    "air-gapped"
+  ],
+  "bin": {
+    "specify": "bin/specify.js"
+  },
+  "files": [
+    "bin/specify.js",
+    "lib/python.js",
+    "lib/runtime.js",
+    "scripts/install_runtime.py",
+    "scripts/postinstall.js",
+    "vendor/",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "specifyKit": {
+    "pep440Version": "1.0.13.dev0",
+    "pythonRequires": ">=3.11",
+    "vendoredPlatforms": [
+      "darwin-arm64",
+      "linux-x86_64",
+      "win32-x64"
+    ],
+    "vendoredPythonTags": [
+      "cp311",
+      "cp312",
+      "cp313"
+    ]
+  }
+}

@@ -48,6 +48,8 @@ specify init my-project --integration copilot
 cd my-project
 ```
 
+如果通过 npm registry 分发软件，可改用 [npm 发行版](https://github.github.io/spec-kit/install/npm.html)：Python 运行时已打包在 tarball 内，安装既不需要 `pip`，也不需要联网。
+
 CLI 只需安装一次，项目只需初始化一次；以下三种流程共用这套准备步骤。
 
 <a id="-支持的-ai-编码助手集成"></a>

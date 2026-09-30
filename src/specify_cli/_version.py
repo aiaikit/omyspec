@@ -189,6 +189,15 @@ _INSTALLER_PATH_PREFIXES: dict[str, list[str]] = {
         "~/.cache/uv/archive-v0/",
         "%LOCALAPPDATA%\\uv\\cache\\archive-v0\\",
     ],
+    # The npm channel unpacks its wheels here, outside any node_modules prefix,
+    # so the launcher path is what identifies the install. The XDG form mirrors
+    # the installer's own root selection; when the variable is unset the
+    # expansion is skipped and the `~/...` entry above still matches.
+    "npm": [
+        "~/.local/share/specify-cli-npm/",
+        "$XDG_DATA_HOME/specify-cli-npm/",
+        "%LOCALAPPDATA%\\specify-cli-npm\\",
+    ],
 }
 
 _RESOLUTION_FAILURE_CATEGORIES: frozenset[str] = frozenset(
@@ -205,6 +214,7 @@ class _InstallMethod(str, Enum):
     UV_TOOL = "uv-tool"
     PIPX = "pipx"
     UVX_EPHEMERAL = "uvx-ephemeral"
+    NPM = "npm"
     SOURCE_CHECKOUT = "source-checkout"
     UNSUPPORTED = "unsupported"
 
@@ -624,6 +634,29 @@ def _manual_tag_or_placeholder(tag: str | None) -> str | None:
         return None
 
 
+_NPM_PACKAGE_NAME = "@aiaikit/specify-cli"
+# PEP 440 writes release candidates without a dot (`1.0.13rc1`) but dev and
+# post releases with one (`1.0.13.dev0`); npm requires a hyphen in both cases.
+_NPM_VERSION_SHAPE_RE = re.compile(
+    r"^(?P<release>\d+\.\d+\.\d+)(?:\.?(?P<kind>a|b|rc|dev|post)\.?(?P<num>\d+))?$"
+)
+_SEMVER_PRERELEASE_KINDS = {"a": "alpha", "b": "beta", "rc": "rc", "dev": "dev", "post": "post"}
+
+
+def _npm_version_spec(target_tag: str | None) -> str:
+    """Translate a git release tag into the version spec npm registry uses."""
+    if target_tag is None:
+        return "latest"
+    text = target_tag.lstrip("vV")
+    match = _NPM_VERSION_SHAPE_RE.match(text)
+    if match is None:
+        return text
+    kind, num = match.group("kind"), match.group("num")
+    if kind is None:
+        return match.group("release")
+    return f"{match.group('release')}-{_SEMVER_PRERELEASE_KINDS[kind]}.{num}"
+
+
 def _assemble_installer_argv(
     method: _InstallMethod, target_tag: str | None
 ) -> list[str] | None:
@@ -657,6 +690,20 @@ def _assemble_installer_argv(
             source_spec,
         ]
 
+    if method == _InstallMethod.NPM:
+        # The npm channel installs from a registry, not from the git source the
+        # Python installers use: `specify init` on the target already has the
+        # vendored wheels, so only the package needs replacing.
+        npm_bin = shutil.which("npm")
+        if npm_bin is None:
+            return None
+        return [
+            npm_bin,
+            "install",
+            "-g",
+            f"{_NPM_PACKAGE_NAME}@{_npm_version_spec(target_tag)}",
+        ]
+
     return None
 
 
@@ -666,7 +713,14 @@ def _installer_binary_name(method: _InstallMethod) -> str | None:
         return "uv"
     if method == _InstallMethod.PIPX:
         return "pipx"
+    if method == _InstallMethod.NPM:
+        return "npm"
     return None
+
+
+def _upgradable_methods() -> tuple["_InstallMethod", ...]:
+    """Methods whose latest version is resolved from a release index."""
+    return (_InstallMethod.UV_TOOL, _InstallMethod.PIPX, _InstallMethod.NPM)
 
 
 def _is_path_like_command(value: str) -> bool:
@@ -680,6 +734,7 @@ def _method_label(method: _InstallMethod) -> str:
         _InstallMethod.UV_TOOL: "uv tool",
         _InstallMethod.PIPX: "pipx",
         _InstallMethod.UVX_EPHEMERAL: "uvx (ephemeral)",
+        _InstallMethod.NPM: "npm",
         _InstallMethod.SOURCE_CHECKOUT: "source checkout",
         _InstallMethod.UNSUPPORTED: "unsupported",
     }[method]
@@ -697,7 +752,7 @@ def _build_upgrade_plan(
 
     if target_tag_override is not None:
         target_tag = target_tag_override
-    elif method in (_InstallMethod.UV_TOOL, _InstallMethod.PIPX):
+    elif method in _upgradable_methods():
         tag, failure_reason = _fetch_latest_release_tag()
         if tag is None:
             return None, failure_reason  # surfaces as exit 1 in the orchestrator
@@ -721,7 +776,7 @@ def _build_upgrade_plan(
 
     current = _get_installed_version()
     argv = _assemble_installer_argv(method, target_tag)
-    if argv is None and method in (_InstallMethod.UV_TOOL, _InstallMethod.PIPX):
+    if argv is None and method in _upgradable_methods():
         command_preview = (
             f"(installer {_installer_binary_name(method)} not found on PATH)"
         )
@@ -980,6 +1035,10 @@ def _emit_guidance(method: _InstallMethod, target_tag: str | None) -> None:
             f"  pipx install --force {_manual_source_spec(target_tag)}",
             soft_wrap=True,
         )
+        console.print(
+            f"  npm install -g {_NPM_PACKAGE_NAME}@{_npm_version_spec(target_tag)}",
+            soft_wrap=True,
+        )
         return
 
     raise RuntimeError(
@@ -1004,6 +1063,11 @@ def _rollback_hint(plan: _UpgradePlan) -> str:
         return (
             f"To pin back to the previous version: pipx install --force "
             f"git+https://github.com/github/spec-kit.git@{rollback_tag}"
+        )
+    if plan.method == _InstallMethod.NPM:
+        return (
+            f"To pin back to the previous version: npm install -g "
+            f"{_NPM_PACKAGE_NAME}@{_npm_version_spec(rollback_tag)}"
         )
     return (
         f"To pin back to the previous version: uv tool install specify-cli --force "
