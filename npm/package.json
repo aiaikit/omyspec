@@ -1,6 +1,6 @@
 {
   "name": "@aiaikit/specify-cli",
-  "version": "1.0.13-dev.0",
+  "version": "1.0.14-dev.0",
   "description": "GitHub Spec Kit \u2014 bootstrap projects for Spec-Driven Development (SDD). npm distribution with a vendored, offline Python runtime.",
   "license": "MIT",
   "publishConfig": {
@@ -40,7 +40,7 @@
     "node": ">=18"
   },
   "specifyKit": {
-    "pep440Version": "1.0.13.dev0",
+    "pep440Version": "1.0.14.dev0",
     "pythonRequires": ">=3.11",
     "vendoredPlatforms": [
       "darwin-arm64",

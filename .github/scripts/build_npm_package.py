@@ -11,6 +11,7 @@ Subcommands
     assemble         write vendor/manifest.json and sync npm/package.json
     check            validate an already-assembled package without writing
     pack             assemble, then run `npm pack`
+    sync-version     re-lock npm/package.json to pyproject.toml, no wheels needed
 
 One `download-vendor` run only covers the OS/CPython pair executing it, because
 wheels with native extensions resolve for the local platform. Publish jobs must
@@ -251,6 +252,27 @@ def write_package_json(pep440: str, platforms: dict) -> None:
     PACKAGE_JSON.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
 
 
+def sync_version() -> int:
+    """Re-lock the version fields of npm/package.json to pyproject.toml.
+
+    A release bump edits pyproject.toml alone, so this is the only command that
+    clears the version-drift guard without a vendored wheel set present. The
+    support matrix is left as declared; `assemble` owns those fields.
+    """
+    pep440, _ = pyproject_versions()
+    package = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
+    meta = package.setdefault("specifyKit", {})
+    previous = package.get("version")
+    if previous == to_semver(pep440) and meta.get("pep440Version") == pep440:
+        print(f"npm/package.json already matches pyproject.toml ({pep440})")
+        return 0
+    package["version"] = to_semver(pep440)
+    meta["pep440Version"] = pep440
+    PACKAGE_JSON.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
+    print(f"npm/package.json version {previous} -> {to_semver(pep440)} (pyproject {pep440})")
+    return 0
+
+
 def assemble() -> dict:
     common, platforms, checksums = scan_vendor(VENDOR_DIR)
     pep440, requires_python = pyproject_versions()
@@ -351,7 +373,8 @@ def check() -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "command", choices=("download-vendor", "assemble", "check", "pack")
+        "command",
+        choices=("download-vendor", "assemble", "check", "pack", "sync-version"),
     )
     parser.add_argument("--out-dir", type=Path, default=REPO_ROOT / "dist")
     args = parser.parse_args(argv)
@@ -361,6 +384,8 @@ def main(argv: list[str]) -> int:
             download_vendor()
         elif args.command == "assemble":
             assemble()
+        elif args.command == "sync-version":
+            return sync_version()
         elif args.command == "check":
             return check()
         elif args.command == "pack":

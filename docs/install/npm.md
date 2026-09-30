@@ -110,12 +110,6 @@ dist-tag so `latest` keeps pointing at the last stable release. Every non-dry
 run also uploads the tarball and its `npm-tarball.sha256` as the `npm-tarball`
 artifact, which is what air-gapped sites install from directly.
 
-The tag push starts the npm pipeline directly, in parallel with the GitHub
-Release that `Create Release` publishes. That release is created with
-`GITHUB_TOKEN`, and events caused by `GITHUB_TOKEN` can be suppressed from
-starting further workflow runs, so chaining the npm publish behind it would risk
-publishing nothing at all with no failure to look at.
-
 ## Building the tarball by hand
 
 Run on a connected machine, once per (OS, CPython) pair — wheels carrying
@@ -126,10 +120,14 @@ python3 .github/scripts/build_npm_package.py download-vendor   # per platform
 python3 .github/scripts/build_npm_package.py assemble          # merge + manifest
 python3 .github/scripts/build_npm_package.py check             # matrix + integrity
 python3 .github/scripts/build_npm_package.py pack              # dist/*.tgz
+python3 .github/scripts/build_npm_package.py sync-version      # version only
 ```
 
 `assemble` rewrites `npm/package.json`'s version from `pyproject.toml`, so the
-npm and PyPI identities of a release cannot diverge.
+npm and PyPI identities of a release cannot diverge. A release bump edits
+`pyproject.toml` alone, which leaves the committed `package.json` one version
+behind; the test suite fails on that drift, and `sync-version` repairs it on a
+machine that has never downloaded a wheel.
 
 ## Troubleshooting
 
