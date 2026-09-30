@@ -7,6 +7,6 @@ func ExtensionCmd() *cobra.Command {
 		Use:   "extension",
 		Short: "Manage extensions",
 	}
-	cmd.AddCommand(ExtensionListCmd(), ExtensionInfoCmd())
+	cmd.AddCommand(ExtensionListCmd(), ExtensionInfoCmd(), ExtensionRemoveCmd())
 	return cmd
 }

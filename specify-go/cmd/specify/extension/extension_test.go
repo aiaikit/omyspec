@@ -28,6 +28,38 @@ func TestExtensionListCmd(t *testing.T) {
 	}
 }
 
+func TestExtensionRemoveCmd_BundledError(t *testing.T) {
+	cmd := ExtensionRemoveCmd()
+	if cmd == nil {
+		t.Fatal("ExtensionRemoveCmd() returned nil")
+	}
+	if cmd.Name() != "remove" {
+		t.Errorf("name = %q, want %q", cmd.Name(), "remove")
+	}
+	if cmd.Use != "remove [id]" {
+		t.Errorf("use = %q, want %q", cmd.Use, "remove [id]")
+	}
+}
+
+func TestExtensionRemoveCmd_NotFound(t *testing.T) {
+	cmd := ExtensionRemoveCmd()
+	if cmd == nil {
+		t.Fatal("ExtensionRemoveCmd() returned nil")
+	}
+
+	buf := &strings.Builder{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"nonexistent-id"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for nonexistent extension id")
+	}
+	if !strings.Contains(err.Error(), "nonexistent-id") {
+		t.Errorf("error = %q, want it to contain %q", err.Error(), "nonexistent-id")
+	}
+}
+
 func TestExtensionInfoCmd_NotFound(t *testing.T) {
 	cmd := ExtensionInfoCmd()
 	if cmd == nil {
