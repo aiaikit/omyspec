@@ -1,11 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 
+	"github.com/aiaikit/speckit/internal/assets"
 	"github.com/aiaikit/speckit/internal/integration"
-	"github.com/aiaikit/speckit/internal/projectstate"
+	"github.com/aiaikit/speckit/internal/render"
 	"github.com/aiaikit/speckit/internal/ui"
+	"github.com/aiaikit/speckit/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +27,7 @@ func InitCmd() *cobra.Command {
 	cmd.Flags().Bool("here", false, "Initialize in the current directory")
 	cmd.Flags().Bool("force", false, "Force init even if already initialized")
 	cmd.Flags().Bool("non-interactive", false, "Run without prompting")
-	cmd.Flags().Bool("script", false, "Output the init script instead of running it")
+	cmd.Flags().String("script", "", "Output the init script instead of running it")
 	cmd.Flags().String("integration", "", "Integration key to configure (claude, copilot, codex, generic)")
 	cmd.Flags().String("integration-options", "", "JSON options for the integration")
 	cmd.Flags().String("preset", "", "Preset name to apply")
@@ -33,50 +39,272 @@ func InitCmd() *cobra.Command {
 func runInit(cmd *cobra.Command, args []string) error {
 	flags := parseInitFlags(cmd, args)
 
-	_, err := projectstate.ResolveProjectRoot()
-	if err == nil && !flags.force {
-		return fmt.Errorf("project already initialized (use --force to re-init)")
+	// Determine project path
+	var projectPath string
+	var createdDir bool
+	if flags.here {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("getwd: %w", err)
+		}
+		projectPath = cwd
+		// Check non-empty directory
+		if !flags.force {
+			entries, err := os.ReadDir(projectPath)
+			if err != nil {
+				return fmt.Errorf("read current directory: %w", err)
+			}
+			// Filter out . and ..
+			hasEntries := false
+			for _, e := range entries {
+				if e.Name() != "." && e.Name() != ".." {
+					hasEntries = true
+					break
+				}
+			}
+			if hasEntries {
+				return fmt.Errorf("current directory is not empty (use --force to merge)")
+			}
+		}
+	} else {
+		// Project name or path as first arg, default to "."
+		name := "."
+		if len(args) > 0 {
+			name = args[0]
+		}
+		abs, err := filepath.Abs(name)
+		if err != nil {
+			return fmt.Errorf("abs: %w", err)
+		}
+		projectPath = abs
+		if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+			if err := os.MkdirAll(projectPath, 0755); err != nil {
+				return fmt.Errorf("create project directory: %w", err)
+			}
+			createdDir = true
+		} else if err != nil {
+			return fmt.Errorf("stat project directory: %w", err)
+		}
 	}
 
+	// Rollback: remove project dir if we created it and an error occurs
+	removeOnError := func() {
+		if createdDir {
+			os.RemoveAll(projectPath)
+		}
+	}
+
+	// Banner
 	banner := ui.Show()
 	fmt.Fprintln(cmd.OutOrStdout(), banner)
 
-	tr := ui.NewTracker("Init Steps")
+	// StepTracker
+	tr := ui.NewTracker("Initialize Specify Project")
 	tr.Add("project", "Initialize project")
-	tr.Mark("project", ui.Done, "done")
-
+	tr.Add("integration", "Configure integration")
+	tr.Add("shared-infra", "Install shared infrastructure")
+	tr.Add("scripts", "Copy scripts")
+	tr.Add("templates", "Copy templates")
+	tr.Add("manifest", "Write manifest")
+	tr.Add("workflow", "Install bundled workflow")
+	tr.Add("final", "Finalize")
+	tr.Mark("project", ui.Running, "")
 	fmt.Fprintln(cmd.OutOrStdout(), tr.Render())
 
-	if flags.integration != "" {
-		_, err := integration.GetIntegration(flags.integration)
-		if err != nil {
-			return fmt.Errorf("unknown integration key %q: %w", flags.integration, err)
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "integration: %s\n", flags.integration)
+	// Resolve integration
+	integrationKey := flags.integration
+	if integrationKey == "" {
+		integrationKey = "claude" // default
 	}
+	_, err := integration.GetIntegration(integrationKey)
+	if err != nil {
+		return fmt.Errorf("unknown integration key %q: %w", integrationKey, err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "integration: %s\n", integrationKey)
 
+	// Write integration state
+	tr.Mark("integration", ui.Running, integrationKey)
+	state := &integration.IntegrationState{
+		Version:                version.Version,
+		IntegrationStateSchema: integration.IntegrationStateSchema,
+		Integration:           integrationKey,
+		InstalledIntegrations:  []string{integrationKey},
+	}
+	if err := integration.WriteState(projectPath, state); err != nil {
+		tr.Mark("integration", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("write integration state: %w", err)
+	}
+	tr.Mark("integration", ui.Done, integrationKey)
+
+	// Install shared infra: scripts + templates
+	tr.Mark("shared-infra", ui.Running, "")
+	if err := copyDir(assets.Scripts(), projectPath, ".specify", "scripts"); err != nil {
+		tr.Mark("shared-infra", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("copy scripts: %w", err)
+	}
+	tr.Mark("scripts", ui.Done, "done")
+	if err := copyDir(assets.Templates(), projectPath, ".specify", "templates"); err != nil {
+		tr.Mark("shared-infra", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("copy templates: %w", err)
+	}
+	tr.Mark("templates", ui.Done, "done")
+	tr.Mark("shared-infra", ui.Done, "done")
+
+	// Write manifest
+	tr.Mark("manifest", ui.Running, "")
+	manifest := render.NewManifest(version.Version)
+	if err := render.WriteManifest(projectPath, manifest); err != nil {
+		tr.Mark("manifest", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("write manifest: %w", err)
+	}
+	tr.Mark("manifest", ui.Done, "done")
+
+	// Write init-options.json
+	tr.Mark("final", ui.Running, "")
+	opts := initOptions{
+		AI:                integrationKey,
+		Integration:       integrationKey,
+		Script:            detectScriptType(),
+		SpeckitVersion:    version.Version,
+		Here:              flags.here,
+		FeatureNumbering:  true,
+	}
+	if flags.preset != "" {
+		opts.Preset = &flags.preset
+	}
 	if len(flags.extensions) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "extensions: %v\n", flags.extensions)
+		opts.Extensions = flags.extensions
+	}
+	optsData, err := json.MarshalIndent(opts, "", "  ")
+	if err != nil {
+		tr.Mark("final", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("marshal init-options: %w", err)
+	}
+	optsData = append(optsData, '\n')
+	optsPath := filepath.Join(projectPath, ".specify", "init-options.json")
+	dir := filepath.Dir(optsPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		tr.Mark("final", ui.Error, "failed")
+		removeOnError()
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".init-options.json.tmp.*")
+	if err != nil {
+		tr.Mark("final", ui.Error, "failed")
+		removeOnError()
+		return err
+	}
+	if _, err := tmp.Write(optsData); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		tr.Mark("final", ui.Error, "failed")
+		removeOnError()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmp.Name())
+		tr.Mark("final", ui.Error, "failed")
+		removeOnError()
+		return err
+	}
+	if err := os.Rename(tmp.Name(), optsPath); err != nil {
+		os.Remove(tmp.Name())
+		tr.Mark("final", ui.Error, "failed")
+		removeOnError()
+		return err
 	}
 
-	if flags.script {
-		fmt.Fprintln(cmd.OutOrStdout(), "(script output not yet implemented)")
+	// Copy bundled workflow: workflows/speckit/workflow.yml
+	tr.Mark("workflow", ui.Running, "")
+	wfSrc, err := assets.BundledWorkflow("speckit")
+	if err != nil {
+		tr.Mark("workflow", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("bundled workflow speckit: %w", err)
 	}
+	wfDstDir := filepath.Join(projectPath, ".specify", "workflows", "speckit")
+	if err := os.MkdirAll(wfDstDir, 0755); err != nil {
+		tr.Mark("workflow", ui.Error, "failed")
+		removeOnError()
+		return err
+	}
+	wfData, err := fs.ReadFile(wfSrc, "workflow.yml")
+	if err != nil {
+		tr.Mark("workflow", ui.Error, "failed")
+		removeOnError()
+		return fmt.Errorf("read bundled workflow.yml: %w", err)
+	}
+	wfDstPath := filepath.Join(wfDstDir, "workflow.yml")
+	if err := os.WriteFile(wfDstPath, wfData, 0644); err != nil {
+		tr.Mark("workflow", ui.Error, "failed")
+		removeOnError()
+		return err
+	}
+	tr.Mark("workflow", ui.Done, "done")
 
-	_ = flags // ponytail: use parsed flags in follow-up tasks
+	tr.Mark("final", ui.Done, "done")
+	fmt.Fprintln(cmd.OutOrStdout(), tr.Render())
 	return nil
 }
 
+// copyDir copies all files from srcFS into projectPath/rootRelBase/relRoot.
+// It preserves directory structure.
+func copyDir(srcFS fs.FS, projectPath, rootRelBase, relRoot string) error {
+	dstDir := filepath.Join(projectPath, rootRelBase, relRoot)
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return err
+	}
+	return fs.WalkDir(srcFS, ".", func(srcPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		srcData, readErr := fs.ReadFile(srcFS, srcPath)
+		if readErr != nil {
+			return readErr
+		}
+		dstPath := filepath.Join(dstDir, srcPath)
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+			return err
+		}
+		return os.WriteFile(dstPath, srcData, 0644)
+	})
+}
+
+// detectScriptType returns "sh" on Unix, "ps" on Windows.
+func detectScriptType() string {
+	return "sh" // ponytail: detect OS at runtime; add windows/powershell support later
+}
+
+type initOptions struct {
+	AI               string   `json:"ai"`
+	Integration      string   `json:"integration"`
+	Script           string   `json:"script"`
+	SpeckitVersion   string   `json:"speckit_version"`
+	Here             bool     `json:"here"`
+	FeatureNumbering bool     `json:"feature_numbering"`
+	Preset           *string  `json:"preset,omitempty"`
+	Extensions       []string `json:"extensions,omitempty"`
+	// ponytail: add integration-options, ignore-agent-tools when Phase 3 adds CLI detection
+}
+
 type initFlags struct {
-	here              bool
-	force             bool
-	nonInteractive    bool
-	script            bool
-	integration       string
-	integrationOpts   string
-	preset            string
-	extensions        []string
-	ignoreAgentTools  bool
+	here             bool
+	force            bool
+	nonInteractive   bool
+	script           string
+	integration      string
+	integrationOpts  string
+	preset           string
+	extensions       []string
+	ignoreAgentTools bool
 }
 
 func parseInitFlags(cmd *cobra.Command, args []string) initFlags {
@@ -84,7 +312,7 @@ func parseInitFlags(cmd *cobra.Command, args []string) initFlags {
 	flags.here, _ = cmd.Flags().GetBool("here")
 	flags.force, _ = cmd.Flags().GetBool("force")
 	flags.nonInteractive, _ = cmd.Flags().GetBool("non-interactive")
-	flags.script, _ = cmd.Flags().GetBool("script")
+	flags.script, _ = cmd.Flags().GetString("script")
 	flags.integration, _ = cmd.Flags().GetString("integration")
 	flags.integrationOpts, _ = cmd.Flags().GetString("integration-options")
 	flags.preset, _ = cmd.Flags().GetString("preset")
