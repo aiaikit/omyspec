@@ -7,6 +7,7 @@ import (
 
 	"github.com/aiaikit/speckit/internal/version"
 	"github.com/aiaikit/speckit/cmd/specify/extension"
+	"github.com/aiaikit/speckit/cmd/specify/preset"
 )
 
 // NewRootCmd constructs the root cobra command for the specify CLI.
@@ -25,7 +26,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(InitCmd())
 	cmd.AddCommand(placeholderCmd("integration"))
 	cmd.AddCommand(extension.ExtensionCmd())
-	cmd.AddCommand(placeholderCmd("preset"))
+	cmd.AddCommand(preset.PresetCmd())
 	cmd.AddCommand(placeholderCmd("workflow"))
 	cmd.AddCommand(placeholderCmd("event"))
 	cmd.AddCommand(placeholderCmd("bundle"))
