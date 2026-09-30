@@ -31,7 +31,22 @@ func NewClient(opts ...Option) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
-	c.httpClient = &http.Client{Timeout: c.timeout}
+	c.httpClient = &http.Client{
+		Timeout: c.timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) == 0 {
+				return nil
+			}
+			prev := via[len(via)-1].URL.String()
+			if stripAuthOnRedirect(prev, req.URL.String()) {
+				req.Header.Del("Authorization")
+			}
+			if len(via) >= 10 {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
 	return c
 }
 
