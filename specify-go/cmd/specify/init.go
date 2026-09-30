@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -311,11 +312,18 @@ func ensureConstitutionFromTemplate(projectPath string, tracker ui.Tracker) erro
 		return fmt.Errorf("mkdir memory dir: %w", err)
 	}
 	dstPath := filepath.Join(dir, "constitution.md")
-	if info, statErr := os.Stat(dstPath); statErr == nil && info.Mode().IsRegular() {
+	var statErr error
+	if info, err := os.Stat(dstPath); err == nil && info.Mode().IsRegular() {
 		tracker.Mark("constitution", ui.Skipped, "already exists")
 		return nil
+	} else {
+		statErr = err
 	}
-	// If stat failed for a reason other than not existing, treat it as "not exists"
+	// Permission denied or other non-NotExist error — don't overwrite
+	if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
+		tracker.Mark("constitution", ui.Error, fmt.Sprintf("cannot check existing file: %v", statErr))
+		return nil
+	}
 	if writeErr := os.WriteFile(dstPath, srcData, 0644); writeErr != nil {
 		return fmt.Errorf("write constitution: %w", writeErr)
 	}

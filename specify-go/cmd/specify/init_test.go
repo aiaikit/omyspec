@@ -30,6 +30,33 @@ func TestEnsureConstitutionFromTemplate_Materializes(t *testing.T) {
 	}
 }
 
+func TestEnsureConstitutionFromTemplate_PermissionDenied(t *testing.T) {
+	tmp := t.TempDir()
+	memDir := filepath.Join(tmp, ".specify", "memory")
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(memDir, "constitution.md")
+	if err := os.WriteFile(dst, []byte("secret"), 0444); err != nil {
+		t.Fatal(err)
+	}
+
+	tr := ui.NewTracker("test")
+	err := ensureConstitutionFromTemplate(tmp, tr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Must NOT be overwritten
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "secret" {
+		t.Fatalf("constitution was overwritten, want 'secret', got %q", string(got))
+	}
+}
+
 func TestEnsureConstitutionFromTemplate_SkipsIfExists(t *testing.T) {
 	tmp := t.TempDir()
 	memDir := filepath.Join(tmp, ".specify", "memory")
