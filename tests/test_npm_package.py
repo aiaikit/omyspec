@@ -105,7 +105,12 @@ class TestOfflineInstallInvariant:
 
 
 class TestVersionSync:
-    """package.json is generated from pyproject.toml and may not drift."""
+    """package.json is generated from pyproject.toml and may not drift.
+
+    A release bump edits pyproject.toml alone, which fails this guard until the
+    new version is carried across: `python .github/scripts/build_npm_package.py
+    sync-version` does that without needing a vendored wheel set.
+    """
 
     def test_version_matches_pyproject(self, package, pyproject_version, builder):
         assert package["version"] == builder.to_semver(pyproject_version)
@@ -136,6 +141,55 @@ class TestVersionSync:
 
     def test_build_script_hardcodes_no_version(self, builder):
         assert builder.MANIFEST_SCHEMA_VERSION == "1"
+
+
+class TestVersionSyncCommand:
+    """`sync-version` repairs drift where no wheels have ever been vendored."""
+
+    @pytest.fixture
+    def stale_package(self, tmp_path, monkeypatch, builder):
+        """Point package.json and the vendor dir at a scratch tree with an old version."""
+        package = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
+        package["version"] = "0.0.1"
+        package["specifyKit"]["pep440Version"] = "0.0.1"
+        target = tmp_path / "package.json"
+        target.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
+        monkeypatch.setattr(builder, "PACKAGE_JSON", target)
+        monkeypatch.setattr(builder, "VENDOR_DIR", tmp_path / "vendor")
+        return package, target
+
+    def test_carries_the_pyproject_version_across(self, stale_package, builder, pyproject_version):
+        _, target = stale_package
+        builder.sync_version()
+        written = json.loads(target.read_text(encoding="utf-8"))
+        assert written["version"] == builder.to_semver(pyproject_version)
+        assert written["specifyKit"]["pep440Version"] == pyproject_version
+
+    def test_leaves_the_fields_it_does_not_own(self, stale_package, builder):
+        declared, target = stale_package
+        builder.sync_version()
+        written = json.loads(target.read_text(encoding="utf-8"))
+        assert list(written) == list(declared), "sync-version must not reorder keys"
+        assert {k: v for k, v in written.items() if k not in ("version", "specifyKit")} == {
+            k: v for k, v in declared.items() if k not in ("version", "specifyKit")
+        }
+        assert {
+            k: v for k, v in written["specifyKit"].items() if k != "pep440Version"
+        } == {k: v for k, v in declared["specifyKit"].items() if k != "pep440Version"}
+
+    def test_needs_no_vendored_wheels(self, stale_package, builder):
+        _, target = stale_package
+        assert not builder.VENDOR_DIR.exists()
+        builder.sync_version()
+        assert target.is_file()
+
+    def test_reports_success_without_writing_when_aligned(self, stale_package, builder, capsys):
+        _, target = stale_package
+        builder.sync_version()
+        after = target.read_text(encoding="utf-8")
+        assert builder.sync_version() == 0
+        assert target.read_text(encoding="utf-8") == after
+        assert "already matches" in capsys.readouterr().out
 
 
 class TestLauncherContract:
