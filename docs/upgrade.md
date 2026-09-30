@@ -8,10 +8,11 @@
 
 | What to Upgrade | Command | When to Use |
 |----------------|---------|-------------|
-| **CLI Tool (recommended)** | `specify self upgrade` | Latest stable release, in place. Auto-detects whether you installed via `uv tool` or `pipx`. |
+| **CLI Tool (recommended)** | `specify self upgrade` | Latest stable release, in place. Auto-detects whether you installed via `uv tool`, `pipx`, or npm. |
 | **CLI Tool — pin a version** | `specify self upgrade --tag vX.Y.Z[suffix]` | Upgrade to a specific release tag instead of the latest stable. Suffixes are limited to dev, alpha/beta/rc, and/or build metadata forms. |
 | **CLI Tool — manual fallback** | `uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git@vX.Y.Z` | When `specify self upgrade` isn't available (older installs) or when you want explicit control. |
 | **CLI Tool — manual fallback (pipx)** | `pipx install --force git+https://github.com/github/spec-kit.git@vX.Y.Z` | Same as above, for pipx installs. |
+| **CLI Tool — manual fallback (npm)** | `npm install -g @aiaikit/specify-cli@X.Y.Z` | Same as above, for the [npm distribution](install/npm.md). Resolves against your configured registry. |
 | **Project Files** | Run `specify integration upgrade <key>`, then `specify extension update` | Refresh installed integration files and extensions in your project |
 | **Both** | Run CLI upgrade, then project update | Recommended for major version updates |
 
@@ -32,14 +33,16 @@ specify self check
 # Preview what would run, without actually upgrading
 specify self upgrade --dry-run
 
-# Upgrade in place to the latest stable release (auto-detects uv tool vs pipx install)
+# Upgrade in place to the latest stable release (auto-detects uv tool vs pipx vs npm)
 specify self upgrade
 
 # Or pin a specific release tag (replace vX.Y.Z[suffix] with the tag you want)
 specify self upgrade --tag vX.Y.Z[suffix]
 ```
 
-Bare `specify self upgrade` executes immediately, matching the no-prompt behavior of commands like `pip install -U` and `npm update`. The CLI classifies your runtime into one of: `uv tool`, `pipx`, `uvx (ephemeral)`, source checkout, or unsupported. Only `uv tool` and `pipx` are upgraded automatically; for `uv tool` installs, it runs `uv tool install specify-cli --force --from <git ref>` under the hood so pinned release tags work. The other paths print path-specific guidance and exit 0 without touching anything.
+Bare `specify self upgrade` executes immediately, matching the no-prompt behavior of commands like `pip install -U` and `npm update`. The CLI classifies your runtime into one of: `uv tool`, `pipx`, `npm`, `uvx (ephemeral)`, source checkout, or unsupported. Only `uv tool`, `pipx`, and `npm` are upgraded automatically; for `uv tool` installs, it runs `uv tool install specify-cli --force --from <git ref>` under the hood so pinned release tags work, and for the npm distribution it runs `npm install -g @aiaikit/specify-cli@<version>`. The other paths print path-specific guidance and exit 0 without touching anything.
+
+The npm channel is the offline-friendly one: it vendors its own Python runtime, so the upgrade only needs your configured npm registry. The *target version*, however, is still resolved from GitHub Releases — when the machine cannot reach GitHub, pass `--tag vX.Y.Z` explicitly.
 
 Pinned tags must start with `vMAJOR.MINOR.PATCH`. Optional suffixes are limited to dev, alpha/beta/rc, and/or build metadata forms such as `v1.0.0-rc1`, `v0.8.0.dev0`, `v0.8.0+build.42`, or the combination `v1.0.0-rc1+build.42`; branch names, hash refs, `latest`, and bare versions without `v` are rejected.
 
@@ -71,6 +74,17 @@ Upgrade to a specific release:
 
 ```bash
 pipx install --force git+https://github.com/github/spec-kit.git@vX.Y.Z
+```
+
+### If you installed with `npm`
+
+The [npm distribution](install/npm.md) ships its own Python runtime, so upgrading is a plain registry install. Replace `X.Y.Z` with a release tag, or use `latest`:
+
+```bash
+npm install -g @aiaikit/specify-cli@X.Y.Z
+
+# Against an internal mirror, or from a transferred tarball:
+npm install -g ./aiaikit-specify-cli-X.Y.Z.tgz
 ```
 
 ### Verify the upgrade
@@ -281,7 +295,7 @@ preset/extension-managed — see the "Interaction with the resolution stack" sec
 ### Scenario 1: "I just want new slash commands"
 
 ```bash
-# Upgrade CLI (auto-detects uv tool vs pipx install)
+# Upgrade CLI (auto-detects uv tool vs pipx vs npm install)
 specify self upgrade
 
 # Inspect installed integrations

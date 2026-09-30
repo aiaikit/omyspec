@@ -47,6 +47,10 @@ specify init my-project --integration copilot
 cd my-project
 ```
 
+Distributing through an npm registry instead? An [npm
+distribution](https://github.github.io/spec-kit/install/npm.html) vendors the
+Python runtime inside the tarball, so install needs no `pip` and no network.
+
 <a id="-supported-ai-coding-agent-integrations"></a>
 
 The examples use **GitHub Copilot's default skills mode**. Replace `copilot` with

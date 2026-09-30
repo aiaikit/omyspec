@@ -92,6 +92,7 @@ Works offline, behind firewalls, and on **Windows, macOS, and Linux**. Host your
 Community extensions like CI Guard and Architecture Guard add compliance gates and governance that fit the way your team already works.
 
 <a href="install/air-gapped.md" class="pillar-link">Enterprise / Air-Gapped →</a>&nbsp;&nbsp;
+<a href="install/npm.md" class="pillar-link">Install from npm →</a>&nbsp;&nbsp;
 <a href="reference/overview.md" class="pillar-link">Reference →</a>
 
 </div>

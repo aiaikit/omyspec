@@ -46,6 +46,11 @@ env/
 sdd-*/
 docs/dev
 
+# npm distribution: the vendored wheel set is generated on a connected build
+# machine by .github/scripts/build_npm_package.py and must never be committed.
+npm/vendor/
+npm/node_modules/
+
 # Extension system
 .specify/extensions/.cache/
 .specify/extensions/.backup/

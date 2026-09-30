@@ -41,6 +41,32 @@ specify init my-project --integration copilot
 >
 > **Windows note:** Offline scaffolding requires PowerShell 7+ (`pwsh`), not Windows PowerShell 5.x (`powershell.exe`). Install from <https://aka.ms/powershell>.
 
+## Offline install through npm
+
+If your organisation mirrors npm internally, there is a second offline route
+that needs no Python packaging tooling on the target at all:
+`@aiaikit/specify-cli` vendors the `specify-cli` wheel and every runtime
+dependency inside a single tarball and unpacks them with a stdlib-only Python
+script. It requires no `pip`, no `python3-venv`, no compiler, and no root.
+Because the package declares no npm dependencies, mirroring that one package is
+enough — once your mirror has it, `npm install -g @aiaikit/specify-cli` works
+with no egress at all.
+
+To build the tarball on a connected machine instead of relying on a mirror:
+
+```bash
+# On a connected build machine:
+python3 .github/scripts/build_npm_package.py download-vendor   # once per OS + Python
+python3 .github/scripts/build_npm_package.py assemble
+python3 .github/scripts/build_npm_package.py pack              # dist/*.tgz
+
+# Transfer dist/*.tgz to the target, then:
+npm install -g ./aiaikit-specify-cli-1.0.13.tgz
+```
+
+See [Install from npm](npm.md) for requirements, the runtime location, and
+troubleshooting.
+
 ## Git Credential Manager on Linux
 
 If you're having issues with Git authentication on Linux, you can install Git Credential Manager:

@@ -33,6 +33,8 @@
       href: install/pipx.md
     - name: One-time Usage (uvx)
       href: install/one-time.md
+    - name: Install from npm
+      href: install/npm.md
     - name: Enterprise / Air-Gapped
       href: install/air-gapped.md
 

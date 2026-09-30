@@ -488,7 +488,7 @@ from .workflows.step.command_add import workflow_step_add  # noqa: E402,F401
 from .workflows.step.command_remove import workflow_step_remove  # noqa: E402,F401
 
 
-def main():
+def main(prog_name: str | None = None):
     # On Windows the default stdout/stderr code page (e.g. cp1252) cannot encode
     # the Rich banner and box-drawing glyphs, so the CLI crashes with
     # UnicodeEncodeError whenever output is not a UTF-8 TTY (piped, redirected to
@@ -500,7 +500,7 @@ def main():
                 _stream.reconfigure(encoding="utf-8", errors="replace")
             except (AttributeError, ValueError, OSError):
                 pass
-    app()
+    app(prog_name=prog_name)
 
 if __name__ == "__main__":
     main()
