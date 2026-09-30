@@ -123,7 +123,9 @@ class TestNpmUpgradePlan:
     def test_upgrade_argv_does_not_use_git_source(self):
         with patch("specify_cli._version.shutil.which", return_value="/usr/bin/npm"):
             argv = _assemble_installer_argv(_InstallMethod.NPM, "v1.0.13")
-        assert not any("github.com" in part for part in argv)
+        # A source URL would appear as `git+https://…`; rejecting every URL also
+        # rejects registries other than github.com.
+        assert [part for part in argv if "://" in part] == []
 
     def test_rollback_hint_uses_npm(self):
         plan = _UpgradePlan(
